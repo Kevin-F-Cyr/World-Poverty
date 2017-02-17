@@ -1,0 +1,986 @@
+---
+title: 'MA799 Assignment 1: Impacts on Poverty'
+author: "Kevin Cyr, Erik Baziyants, Sandy Dulong, Qing Meng"
+date: "October 24, 2016"
+output:
+  html_document:
+    number sections: yes
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+<style type="text/css">
+h1 { /* Header 1 */
+ font-size: 28px;
+ color: DarkBlue;
+}
+
+h1.title {
+font-size 32px;
+color: MediumBlue
+}
+
+h2 { /* Header 2 */
+ font-size: 22px;
+ color: DarkBlue;
+}
+h3 { /* Header 3 */
+ font-size: 18px;
+ color: DarkBlue;
+</style>
+
+
+# 1.0 Introduction 
+The World Bank is an international financial institution whose officially stated goal is the reduction of poverty [see https://en.wikipedia.org/wiki/World_Development_Indicators]. They work to accomplish this goal by providing financial loans to developing nations for the use of capital programs to improve their economic state. In doing so the World Bank acquires hundreds of thousand pieces of data regarding countries' development and their people's lives from around the world. The 2016 dataset includes 1,400 indicators from over 200 economies [see Fantom, Neil, Tariq Khokar, and Edie Purdie. "The 2016 Edition of World Development Indicators Is Out: Three Features You Won't Want to Miss."The Data Blog. The World Bank, 15 Apr. 2016. Web. 02 Oct. 2016].  
+
+# 2.0 Goal
+The purpose of this report is to determine the significance education and health have on a nation's level of poverty. Our goal is to discover if a relationship exists between poverty and education and/or poverty and health. We have provided our objectives below in section 5.0 Objectives, which will explain how we plan to reach our goal.
+
+# 3.0 Dataset Description
+In the data description section we will provide information about the datasets we will use such as variable name, type, measure of unit, etc. We will first add some code to enable us to read the data file and provide dataset descriptions. 
+
+This section of code will load libraries which are required in order to run certain code. The `WDI` library is loaded to search and download data series from the World Bank Development web site , The `reader` library is loaded for files such as .csv, the `dplyr` library is loaded for manipulating datasets, The `tidyr` library is loaded for data cleanup, and the `stringr` library is loaded formaking string manipulations easier by Using consistent function and argument names: all functions start with str_, and the first argument is always the input string This makes stringr easier to learn and easy to use with the pipe `%>%`, [R Stuidio Blog, https://blog.rstudio.org/2015/05/05/stringr-1-0-0/]. 
+```{r, message=FALSE}
+library(WDI)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+This section of codde will read the WDI data frame from a downloaded CSV file. It provides the column names and format for each variable.
+```{r message=FALSE}
+wdi_data.df = read_csv("C:/Users/Qing Meng/Downloads/MA799A/WDI_csv/WDI_Data.csv")
+```
+
+This section of code will read the WDI series from the downloaded CSV file. It provides the variables and information about them.
+```{r message=FALSE}
+wdi_series.df = read_csv("C:/Users/Qing Meng/Downloads/MA799A/WDI_csv/WDI_Series.csv")
+```
+
+This section of code will read the country look up table that will be used to group countries by region, and additional dimensions. 
+```{r message=FALSE}
+country.lut = read_csv("C:/Users/Qing Meng/Downloads/MA799A/WDI_csv/country_lookup_table.csv")
+```
+
+The dataset, WDI_Data.csv, is a dataframe that contains 372,240 observations (rows) of 60 variables(columns).
+
+Below is a table of the variables we chose explaining the variable, data type, and description [see  http://data.worldbank.org/data-catalog/world-development-indicators]. We explain further in sections below why we chose these variables.
+
+Indicator Code | Variable | Units | Description 
+------------- | ------------- | ------------- | -------------
+SI.POV.NAHC | Poverty: Poverty rates | percent | Poverty headcount ratio at national poverty lines (% of population)
+SI.POV.DDAY | Poverty: Poverty rates | percent | Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)
+SE.PRM.ENRR | Education: Participation | percent | School enrollment, primary (% gross)
+SE.PRM.ENRL.TC.ZS | Education: Inputs | percent | Pupil-teacher ratio, primary
+SH.DYN.MORT | Health: Mortality | percent | Mortality rate, under-5 (per 1,000 live births)
+SH.H2O.SAFE.ZS | Health: Disease prevention | percent | Improved water source (% of population with access)
+SP.POP.TOTL | Health: Population  | numeric: US dollars | Structure	Population, total
+SP.POP.0014.TO.ZS | Health: Population | percent | Structure	Population ages 0-14 (% of total)
+SP.POP.1564.TO.ZS | Health: Population | percent | Structure	Population ages 15-64 (% of total)
+SP.POP.65UP.TO.ZS | Health: Population | percent | Structure	Population ages 65 and above (% of total)
+SP.DYN.LE00.IN | Health: Mortality | number | Life expectancy at birth, total (years)
+SP.DYN.TO65.MA.ZS | Health: Mortality | percent | Survival to age 65, male (% of cohort)
+SP.DYN.TO65.FE.ZS | Health: Mortality | percent | Survival to age 65, female (% of cohort)
+SL.GDP.PCAP.EM.KD | Social Protection & Labor: Economic activity | numeric:USD | GDP per person employed (2011 US dollars)
+NY.GDP.PCAP.CD | Economic Policy & Debt:National:US dollars | numeric:USD | GDP per capita (current US dollars)
+SH.XPD.PCAP | Health: Health services | numeric: USD | Health expenditure per capita (current US dollars)
+
+# 4.0 Dataset Preparation
+In its current state, the data set is too large, unorganized, and unwieldy to understand. This section focusses on preparing the data set for analysis. The goal is to create a tidy dataframe where each column is a variable that we plan to analyze and each row is an observation. 
+
+To easier manage the dataframe in the future, we will rename the dataframe and a few variables.
+```{r}
+"wdi.df" = wdi_data.df
+
+wdi.df %>%
+  rename(country.code   = `Country Code`,
+         country.name   = `Country Name`,
+         indicator.name = `Indicator Name`,
+         indicator.code = `Indicator Code`) %>%
+  {.} -> wdi.df
+
+```
+
+In order to get an accurate view of the availabile values in the dataframe, we first need to make the 'indicator.code' and 'country.code' variables factors. Factors are categorical variables that are super useful in summary statistics, plots, and regressions. They basically act like dummy variables that R codes for you [https://www.r-bloggers.com/data-types-part-3-factors/].
+```{r}
+
+wdi.df$indicator.code = factor(wdi.df$indicator.code)
+
+wdi.df$country.code = factor(wdi.df$country.code)
+
+```
+
+We now gather the year and it's respective value into a key value pair in an effort to create a tidy dataframe.
+```{r}
+wdi.df %>%
+  gather(., 
+         year, value, 
+         -country.name, -country.code, -indicator.name, -indicator.code) %>%
+         {.} -> wdi.df
+
+```
+
+The `year` variable is still a character vector. To organize the results, we make 'year' into an ordered factor. 
+```{r}
+wdi.df$year = factor(wdi.df$year, ordered=TRUE)
+```
+
+Now that the data set is arranged in a tidy manner, we need to select the data that we will be focusing on. 
+
+There are a couple of main factors that are involved in the decision. First off, we need to identify the indicators that are pertinent to achieving our analysis goal. In order to determine the significance education and health have on a nation's level of poverty, we need an indicator of poverty. Poverty indicators are a relatively recent addition to the WDI and therefore are not prevalent throughout the entire data set. This will ultimately constrain the amount of data we will be able to use throughout the report; however, we think there is sufficient data available to achieve our goal. 
+
+To minimize the effect missing values have on future analysis we will need to be diligint selecting the rest of our focus indicators.
+
+The below code pulls the indicators with less than 40% of their values missing. The code achieves this by grouping the data by indicator code, filtering out values recorded before 1990, and summarizing them based on % of missing values. We broke the indicators into categories based on indicator topic. The code below populated poverty indicators. 
+```{r}
+wdi.df %>%
+  group_by(indicator.code) %>%
+  filter(year > 1990) %>%
+
+  summarize(count          = n(),
+            cnt.missing    = sum(is.na(value)),
+            pct.missing    = 100*cnt.missing/count,
+            indicator.name = str_sub(first(indicator.name),1,20)) %>%
+  filter(pct.missing < 90) %>%
+  filter(grepl("SI.", indicator.code)) %>%
+  
+  arrange(pct.missing) %>%
+  select( indicator.name, indicator.code, pct.missing) %>%
+  print(n=12) 
+```
+
+The same process was done for the education, health, social and labor, and economic categories. This allowed us to confidently pick the most available indicators from each relevant category. A full table describing the chosen indicators can be found earlier in the 3.0 Dataset Description tablereport.
+
+The most relevant and available health indicators in the WDI dataset are Life Expectancy, Male Survival To 65, Female Survival To 65, Mortality Rate Under 5, and Health Expenditure Per Capita.The most relevant and available education indicators in the WDI dataset are Primary School Enrollment and Pupil Teacher Ratio. For simplicity, we created a vector 'focus_ind' containing these 16 indicators.
+```{r}
+"focus_ind" <- c("SI.POV.NAHC" ,"SI.POV.DDAY" ,"SE.PRM.ENRR" ,"SE.PRM.ENRL.TC.ZS" ,"SH.DYN.MORT" ,"SH.H2O.SAFE.ZS" , "SP.POP.TOTL" ,"SP.POP.0014.TO.ZS" ,"SP.POP.1564.TO.ZS" ,"SP.POP.65UP.TO.ZS" ,"SP.DYN.LE00.IN" ,  "SP.DYN.TO65.MA.ZS" ,  "SP.DYN.TO65.FE.ZS" ,"SL.GDP.PCAP.EM.KD" ,"NY.GDP.PCAP.CD" ,"SH.XPD.PCAP")
+
+```
+
+We now turn our focus towards time. What will our range of years be for our analysis? As stated above, the collection of poverty indicators is more prevalent in the recent years than that of past. We will want to select a range that maximizes the percentage of poverty data, but we also want a large enough range that will allow us to view how things change over time. '2000' is an appropriate starting point that satisfies both criteria. 
+
+The below code filters out the indicators, countries and years that will not be part of our analysis.
+```{r}
+
+wdi.df %>%
+  filter(indicator.code %in% focus_ind) %>%
+  filter(year >= 2000) %>%
+  {.} -> wdi.df
+
+```
+
+Now we have a view of the data set that contains only our focus indicator codes and our target range; however, there are still missing values. The below code alters the variables to ignore the missing values. 
+```{r}
+wdi.df %>%
+  mutate(indicator.code=factor(indicator.code),
+         year          =factor(year)) %>%
+  {.} -> wdi.df
+```
+
+The code below places each indicator code in its own column. 
+```{r}
+wdi.df %>%
+  select(-indicator.name) %>%
+  spread(indicator.code,value) %>%
+  {.} -> wdi.df
+
+```
+
+Now we want to confine our focus a bit further. We want to focus on a set of countries that satisfy the following criteria: 
+
+a) Poverty indicator data is available.
+b) The countries are representative the the world, not just a single region. This is necessary to determine if any of the trends found in the analysis are worldwide or if they are refined to a a geographic area.
+
+This below code pulls a list of the countries in the dataset and organizes them based on the availability of poverty data.We will only print the top 10 to save space.
+```{r}
+wdi.df %>%
+  group_by(country.code) %>%
+  filter(year >= 2000) %>%
+  
+  
+  summarize(count.POV.NAHC = sum(!is.na(SI.POV.NAHC))/16,
+            count.POV.DDAY = sum(!is.na(SI.POV.DDAY))/16,
+             total.pov.count = (count.POV.DDAY+count.POV.NAHC)/2 ) %>% 
+  
+  arrange(desc(total.pov.count)) %>%
+ 
+  select(country.code,count.POV.DDAY, count.POV.NAHC, total.pov.count) %>%
+  
+  print(wdi.df, n=10)
+
+```
+
+Using this table, we chose a handful of countries that satisfy the above criteria from each of the major regions: the Americas, Europe, and Asia. The other main continent, Africa, is left out due to lack of data. We put them into vectors named 'focus_country_names' and 'focus_country_codes' and filter the rest out of the data set.
+```{r}
+
+"focus_country_codes" <- c("BEL","DOM","PER", "HND", "RUS", "COL", "POL", "BRA", "TUR" , "HUN" , "THA" , "ARM", "GEO" , "IDN ", "MEX")
+
+"focus_country_names" <- c("Belarus" , "Dominican Republic", "Peru", "Honduras", "Russia", "Colombia", "Poland", "Brazil", "Turkey", "Hungary", "Thailand", "Armenia", "Georgia", "Indonesia", "Mexico")
+
+wdi.df %>%
+  filter(country.code %in% focus_country_codes) %>% 
+  {.} -> wdi.df
+ 
+```
+
+The below code will use the country lookup table, which contains additional dimensions. It will be joined to the WDI dataset, allowing us to explore the selected variables by region and sub-region.
+```{r message=FALSE}
+country.lut$region = factor(country.lut$region)
+country.lut$'alpha-3' = factor(country.lut$'alpha-3')
+country.lut$`sub-region` = factor(country.lut$`sub-region`)
+wdi.df.dimensions = left_join(wdi.df, country.lut, by = c("country.code" = "alpha-3"))
+```
+
+## 4.1 Rename Variables
+The variable names are renamed, to make them easier to understand, and to make them intuitive.
+```{r}
+wdi.df.dimensions <- rename(wdi.df.dimensions, NationalPovertyPercent = SI.POV.NAHC)
+wdi.df.dimensions <- rename(wdi.df.dimensions, PercentLivingOn1.90PerDay = SI.POV.DDAY)
+
+wdi.df.dimensions <- rename(wdi.df.dimensions, PrimarySchoolEnrollment = SE.PRM.ENRR)
+wdi.df.dimensions <- rename(wdi.df.dimensions, PupilTeacherRatio = SE.PRM.ENRL.TC.ZS)
+
+wdi.df.dimensions <- rename(wdi.df.dimensions, MortalityRateUnder5 = SH.DYN.MORT)
+wdi.df.dimensions <- rename(wdi.df.dimensions, PercentWithAccessToWater = SH.H2O.SAFE.ZS)
+wdi.df.dimensions <- rename(wdi.df.dimensions, LifeExpectancy = SP.DYN.LE00.IN)
+wdi.df.dimensions <- rename(wdi.df.dimensions, MaleSurvivalTo65 = SP.DYN.TO65.MA.ZS)
+wdi.df.dimensions <- rename(wdi.df.dimensions, FemaleSurvivalTo65 = SP.DYN.TO65.FE.ZS)
+wdi.df.dimensions <- rename(wdi.df.dimensions, HealthExpenditurePerCapita = SH.XPD.PCAP)
+
+wdi.df.dimensions <- rename(wdi.df.dimensions, TotalPopulation = SP.POP.TOTL)
+wdi.df.dimensions <- rename(wdi.df.dimensions, PercentOfPopulation0to14 = SP.POP.0014.TO.ZS)
+wdi.df.dimensions <- rename(wdi.df.dimensions, PercentOfPopulation15to64 = SP.POP.1564.TO.ZS)
+wdi.df.dimensions <- rename(wdi.df.dimensions, PercentOfPopulationAbove65= SP.POP.65UP.TO.ZS)
+
+wdi.df.dimensions <- rename(wdi.df.dimensions, GDPperPersonEmployed = SL.GDP.PCAP.EM.KD)
+wdi.df.dimensions <- rename(wdi.df.dimensions, GDPperCapita = NY.GDP.PCAP.CD)
+```
+
+## 4.2 Create Indicator Quartiles
+Each indicator that we plan on testing against the poverty indicators is broken into quartile bins.
+```{r}
+
+# Function to create a factor vector 
+# containing `n` quantiles from `inputvar`
+make.ntiles = function (inputvar, n) { 
+  inputvar %>%
+    quantile(., 
+             (1/n) * 1:(n-1),
+             na.rm=TRUE
+    ) %>%
+    c(-Inf, ., Inf) %>%
+    cut(inputvar, 
+        breaks=., 
+        paste("Q", 1:n, sep="")
+    ) 
+}
+
+wdi.df.dimensions %>%
+  
+  mutate(PrimarySchoolEnrollment.Q = make.ntiles(PrimarySchoolEnrollment, 4),
+         PupilTeacherRatio.Q = make.ntiles(PupilTeacherRatio, 4),
+         MortalityRateUnder5.Q = make.ntiles(MortalityRateUnder5, 4),
+         PercentWithAccessToWater.Q = make.ntiles(PercentWithAccessToWater, 4),
+         LifeExpectancy.Q = make.ntiles(LifeExpectancy, 4),
+         MaleSurvivalTo65.Q = make.ntiles(MaleSurvivalTo65, 4),
+         FemaleSurvivalTo65.Q = make.ntiles(FemaleSurvivalTo65, 4),
+         HealthExpenditurePerCapita.Q = make.ntiles(HealthExpenditurePerCapita, 4)
+        ) %>%
+  
+  {.} -> wdi.df.dimensions
+
+
+```
+
+# 5.0 Objectives
+The overarching objective of our goal is discover what type of relationship health and education have on poverty, if any. We will test various indicators against the world poverty indicators, `NationalPovertyPercent` and `PercentLivingOn1.90PerDay`, in an attempt to find a correlation. We would like to find if there is a global relationship between the indicators with results that would help to explain world poverty. To ensure we have an accurate representation of the world, we will be studying several countries from each major region. Ideally, we would want to include every country in the analysis, but the availability of poverty data constrains the total number of countries available for accurate analysis. 
+
+The dataset has over 50 indicators that relate to poverty. For this report, we want to analyze how education and health impacts poverty. We will be focusing on approximately 16 of the variables. We chose these variables as they seemed to be more influential in terms of learning something not so obvious such as employment. For example, we believe it is common knowledge that most people in poverty are unemployed or have jobs paying little money so we will exclude the variables that provide such data.  
+
+We expect to find certain variables have an impact on poverty more than others. It will be interesting to see which countries and regions have higher poverty and why
+
+To see if there is a relationship between any of the indicators and the chosen poverty indicators, the obvious analysis tool would be regressions. Because the statistical toolset at our disposal is constrained to basic descriptives, we have done the next best thing to a regression. We broke each of the above indicators into quartiles and observe how the poverty statistics differ across the quartiles. While this won't give us statistically significant results, it will provide a high level picture of indicators possible relationship.
+
+The poverty indicators we will use are National Poverty Percent and Percent Living On 1.90 Per Day. National Poverty Percent will describe a nation's poverty population while the latter indicator describes the percent of the population in deep poverty.
+
+We are looking for global trends, but we realize there may be trends that are confined to certain regions that do not fully extend to a global level. To test if there are regional trends in the data, we will also perform the analysis describes above at a regional level.
+
+## 5.1 Hypotheses
+
+### 5.11 Health 
+
+We expect to find a negative relationship between the poverty indicators and the following health indicators. `LifeExpectancy`, `MaleSurvivalTo65`, `Female SurvivalTo65`, and `HealthExpenditurePerCapita`. Said differently, as these indicators increase, we expect the rate of poverty to decrease. Conversely, we expect the `MortalityRateUnder5`to have a positive relationship.
+
+These hypotheses align with the common belief that poverty limits access to quality healthcare. Furthermore, the lack of healthcare access may decrease the liklihood that an individual would be able to lift themselves out of poverty.
+
+### 5.12 Education
+We expect to find a negative relationship between `PrimarySchoolEnrollment` and the poverty indicators. Common sense would tell us that the more access a person has to education, the more capable s/he is to earn a decent living.
+
+We expect to find a positive relationship between `PupilTeacherRatio` and the poverty indicators. As the ratio of pupils to teachers increases, the quality of the education the pupils receive is likely to decrease. If there is a relationship between education and poverty, we assume a reduction in the quality of one's education would increase the likelihood of poverty.
+
+# 6.0 Variable summaries
+In this section we will provide a summay of each of the 16 variables we chose. For each variable we will view first by country then by region. [see the series file in http://databank.worldbank.org/data/download/WDI_csv.zip]
+
+## 6.1  National Poverty Percent
+National poverty headcount ratio is the percentage of the population living below the national poverty lines. National estimates are based on population-weighted subgroup estimates from household surveys. 
+```{r}
+wdi.df.dimensions %>% 
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(NationalPovertyPercent, na.rm = TRUE),
+          max = max(NationalPovertyPercent, na.rm = TRUE),
+          min= min(NationalPovertyPercent, na.rm = TRUE),
+          median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+In the subset of the countries of interest there is a large range between the poorest and the least poorest country, with the poorest having 66.5% of the population living the below the poverty line, in contrast to the least poorest having only 1.6% living below the poverty line.
+
+```{r}
+wdi.df.dimensions %>% 
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(NationalPovertyPercent, na.rm = TRUE),
+          max = max(NationalPovertyPercent, na.rm = TRUE),
+          min= min(NationalPovertyPercent, na.rm = TRUE),
+          median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+Analyzing the indicator by region, it can be observed that on the average the poorest countries are in the Americas region having a mean of 40.85% living below the poverty line. On the other end of the spectrum, Europe has an average population of 15.4% living below the poverty line.
+
+## 6.2 Percent of Population Living on $1.90 per Day
+Poverty headcount ratio at $1.90 a day is the percentage of the population living on less than $1.90 a day at 2011 international prices. 
+```{r}
+
+wdi.df.dimensions %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+          max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+          min= min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+          median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+Per the results, we cna see that in the countries observed 7.1% of the population live on $1.90 per day, and the minimum is 0% while the maximum is 29.1%.
+
+```{r}
+wdi.df.dimensions %>%
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+          max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+          min= min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+          median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+We will now compare the descriptive statistics of the indicator to the indicator descriptives by region. We can observe that on the average the European region has a significantly lower percentage of the population living on $1.90 per day. 
+
+## 6.3 Primary School Enrollment
+Gross enrollment ratio is the ratio of total enrollment, regardless of age, to the population of the age group that officially corresponds to the level of education shown. Primary education provides children with basic reading, writing, and mathematics skills along with an elementary understanding of such subjects as history, geography, natural science, social science, art, and music. This indicator can also be interpreted as the percentage of students in each level of an education system.  
+```{r}
+
+wdi.df.dimensions %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PrimarySchoolEnrollment, na.rm = TRUE),
+          max = max(PrimarySchoolEnrollment, na.rm = TRUE),
+          min= min(PrimarySchoolEnrollment, na.rm = TRUE),
+          median = median(PrimarySchoolEnrollment, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+A high percentage could indicate a substantial number of overage children enrolled in each grade. The minimum value for this indicator is 92.2 and a maximum of 130, on the average the ratio 105.
+
+```{r}
+wdi.df.dimensions %>%
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PrimarySchoolEnrollment, na.rm = TRUE),
+          max = max(PrimarySchoolEnrollment, na.rm = TRUE),
+          min= min(PrimarySchoolEnrollment, na.rm = TRUE),
+          median = median(PrimarySchoolEnrollment, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+Analyzing the indicator by region, it can be observed that on the average the highest ratio region is Americas followed by Asia and Europe.
+
+## 6.4 Pupil Teacher Ratio
+Primary school pupil-teacher ratio is the average number of pupils per teacher in primary school.
+```{r}
+
+wdi.df.dimensions %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean( PupilTeacherRatio, na.rm = TRUE),
+          max = max( PupilTeacherRatio, na.rm = TRUE),
+          min= min( PupilTeacherRatio, na.rm = TRUE),
+          median = median(PupilTeacherRatio, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+We can observe that the pupil to teacher ratio on the average will have 19.5 student to 1 teacher. The minimum ratio is 8.68, and the maximum ratio is 34.1
+
+```{r}
+wdi.df.dimensions %>%
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean( PupilTeacherRatio, na.rm = TRUE),
+          max = max( PupilTeacherRatio, na.rm = TRUE),
+          min= min( PupilTeacherRatio, na.rm = TRUE),
+          median = median(PupilTeacherRatio, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+Grouping the pupil-teacher ratio by region, we can observe that the pupil-student ratio on the average is lower in Europe than in both Asia and the Americas. And also that the highest pupil-teacher ratio is in the Americas. We can interpret that as the Americas regions having the most students per single teacher.
+
+## 6.5 Mortality Rate Under 5
+This indicator describes the probability per 1,000 that a newborn baby will die before reaching age five,if subject to age-specific mortality rates of the specified year. 
+```{r}
+wdi.df.dimensions %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(MortalityRateUnder5, na.rm = TRUE),
+          max = max(MortalityRateUnder5, na.rm = TRUE),
+          min= min(MortalityRateUnder5, na.rm = TRUE),
+          median = median(MortalityRateUnder5, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+Of the countries in our analysis, the average percentage of deaths by age 5 are 19.0%, the max is 41.3% and the minimum is 4.1%. 
+
+```{r}
+wdi.df.dimensions %>%
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(MortalityRateUnder5, na.rm = TRUE),
+          max = max(MortalityRateUnder5, na.rm = TRUE),
+          min= min(MortalityRateUnder5, na.rm = TRUE),
+          median = median(MortalityRateUnder5, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+The results show that countries in America and Asia have a higher average, around a quarter of the population die by the age of 5 while Europe has a much lower rate, 8% on average.
+
+## 6.6 Percent of Population with Access to Water
+This indicator describes the percentage of the population using an improved drinking water source. The improved drinking water source includes piped water on premises (piped household water connection located inside the user's dwelling, plot or yard), and other improved drinking water sources (public taps or standpipes, tube wells or boreholes, protected dug wells, protected springs, and rainwater collection).
+```{r}
+wdi.df.dimensions %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentWithAccessToWater, na.rm = TRUE),
+          max = max(PercentWithAccessToWater, na.rm = TRUE),
+          min= min(PercentWithAccessToWater, na.rm = TRUE),
+          median = median(PercentWithAccessToWater, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+The results show an average of 93.7%, max of 100% and min of 79.8%. Access to water has a significant impact on health. 
+
+```{r}
+wdi.df.dimensions %>%
+  group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentWithAccessToWater, na.rm = TRUE),
+          max = max(PercentWithAccessToWater, na.rm = TRUE),
+          min= min(PercentWithAccessToWater, na.rm = TRUE),
+          median = median(PercentWithAccessToWater, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+The results show that each region being aligned with the initial results.
+
+## 6.7 Total Population
+This indicator describes total population based on the de facto definition of population, which counts all residents regardless of legal status or citizenship. The values shown are midyear estimates.
+```{r}
+wdi.df.dimensions %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(TotalPopulation, na.rm = TRUE),
+          max = max(TotalPopulation, na.rm = TRUE),
+          min= min(TotalPopulation, na.rm = TRUE),
+          median = median(TotalPopulation, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+The results show an average of 53M, a max of 207M, and min of approximately 3M people.
+
+```{r}
+wdi.df.dimensions %>%
+  group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(TotalPopulation, na.rm = TRUE),
+          max = max(TotalPopulation, na.rm = TRUE),
+          min= min(TotalPopulation, na.rm = TRUE),
+          median = median(TotalPopulation, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+The results show Americas having the highest average at 66M, max of 2,308M, and min of 62M, followed closely by Europ then Asia.
+
+## 6.8 Percent Of Population 0 to 14
+This indicator describes population between the ages 0 to 14 as a percentage of the total population. Population is based on the de facto definition of population.
+```{r}
+wdi.df.dimensions %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentOfPopulation0to14, na.rm = TRUE),
+          max = max(PercentOfPopulation0to14, na.rm = TRUE),
+          min= min(PercentOfPopulation0to14, na.rm = TRUE),
+          median = median(PercentOfPopulation0to14, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+The results show on average 24.2% of the population are between the ages of 0 to 14, max of 42.3%, and min of 14.5% are under 14 years of age. 
+
+```{r}
+wdi.df.dimensions %>%
+  group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentOfPopulation0to14, na.rm = TRUE),
+          max = max(PercentOfPopulation0to14, na.rm = TRUE),
+          min= min(PercentOfPopulation0to14, na.rm = TRUE),
+          median = median(PercentOfPopulation0to14, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+The results show Americas having the highest percentage, followed closely by Asia than Europe. All three regions show approximately a quarter of the population being in this age group.
+
+## 6.9 Percent Of Population 15 to 64
+This indicator describes the total population between the ages 15 to 64 as a percentage of the total population. Population is based on the de facto definition of population, which counts all residents regardless of legal status or citizenship.
+```{r}
+wdi.df.dimensions %>% 
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentOfPopulation15to64, na.rm = TRUE),
+          max = max(PercentOfPopulation15to64, na.rm = TRUE),
+          min= min(PercentOfPopulation15to64, na.rm = TRUE),
+          median = median(PercentOfPopulation15to64, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+Of the countries in our analysis, the average percentage of the population between the ages 15 to 64 is 66.2%. This is close to 2/3rds of the population. In many countries 15 - 64 is viewed as one's working years. We can conclude that on average, about 2/3rds of the people in our analysis are in their working years. The lowest percentage is 53.6% and the highest is 72.1%. This shows that there is a fair amount of variance for this indicator. 
+
+```{r}
+wdi.df.dimensions %>% 
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentOfPopulation15to64, na.rm = TRUE),
+          max = max(PercentOfPopulation15to64, na.rm = TRUE),
+          min= min(PercentOfPopulation15to64, na.rm = TRUE),
+          median = median(PercentOfPopulation15to64, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+The results do not change a great ordeal when we break down the results by region. We can see that the countries located in the Americas have a slightly lower percentage of their population in the 15 to 64 age bracket, 63.4% than those in Asia or Europe, 67.9% and 68.8%.
+
+## 6.10 Percent Of Population Above 65
+This indicator describes the population ages 65 and above as a percentage of the total population. Population is based on the DE fact definition of population, which counts all residents regardless of legal status or citizenship.
+```{r}
+wdi.df.dimensions %>% 
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentOfPopulationAbove65, na.rm = TRUE),
+          max = max(PercentOfPopulationAbove65, na.rm = TRUE),
+          min= min(PercentOfPopulationAbove65, na.rm = TRUE),
+          median = median(PercentOfPopulationAbove65, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+Of the countries in our analysis, the average percentage of the population that is 65 years of age or older is 9.6%. The highest is 18.2% and the lowest is 3.9%. The median is 7.4%. There is a substantial difference between the maximum and minimum percentages. In one case, almost 1 out of 5 persons is 65 or older. In the case of the minimum, that ratio drops to 1 out of 25.
+
+```{r}
+wdi.df.dimensions %>% 
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(PercentOfPopulationAbove65, na.rm = TRUE),
+          max = max(PercentOfPopulationAbove65, na.rm = TRUE),
+          min= min(PercentOfPopulationAbove65, na.rm = TRUE),
+          median = median(PercentOfPopulationAbove65, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+After breaking down the results by region, we find stark differences. When comparing the countries located in the Americas with Asia and then with Europe, we find significant increases in all 4 of the descriptives mean, max,min, and median. We conclude that of the countries in our analysis, both the Asian and European countries have a significantly higher ratio of people past their working years than the American countries, and the European countries have significantly higher ratio than both the Asian and American countries.
+
+## 6.11 Life Expectancy
+Life expectancy at birth indicates the number of years a newborn infant would live if prevailing patterns of mortality at the time of its birth were to stay the same throughout its life.
+```{r}
+wdi.df.dimensions %>% 
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(LifeExpectancy, na.rm = TRUE),
+          max = max(LifeExpectancy, na.rm = TRUE),
+          min= min(LifeExpectancy, na.rm = TRUE),
+          median = median(LifeExpectancy, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+From the output we gather that the mean life expectancy is 73 years. The highest life expectancy of any nation in our analysis is 81 years and the lowest is 65 years. The median life expectancy is 73 years. There is a significant difference between the max and min, 16 years. 
+
+```{r}
+wdi.df.dimensions %>% 
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(LifeExpectancy, na.rm = TRUE),
+          max = max(LifeExpectancy, na.rm = TRUE),
+          min= min(LifeExpectancy, na.rm = TRUE),
+          median = median(LifeExpectancy, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+From the output we see that the means do not show much variance as they are all within a year of each other. There is some variance when comparing maximums and minimums. While there is only a 7 year and a 5 year difference between the extremes of the American and Asian countries, the differences between the maximum and minimum values of the European countries is 16 years. Of the countries in our analysis, the European nations account for both the highest and the lowest life expectancy.
+
+## 6.12 Male Survival To 65
+Male survival to age 65 refers to the percentage of a cohort of newborn male infant that would survive to age 65, if subject to age specific mortality rates of the specified year.
+```{r}
+wdi.df.dimensions %>% 
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(MaleSurvivalTo65, na.rm = TRUE),
+          max = max(MaleSurvivalTo65, na.rm = TRUE),
+          min= min(MaleSurvivalTo65, na.rm = TRUE),
+          median = median(MaleSurvivalTo65, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+The average percentage of male survival to age 65 in all selected countries is 70.1%. The highest percentage of any country in the analysis is 85.1%, and the lowest is 41.6%.The median is 70.9%. 
+
+```{r}
+wdi.df.dimensions %>% 
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(MaleSurvivalTo65, na.rm = TRUE),
+          max = max(MaleSurvivalTo65, na.rm = TRUE),
+          min= min(MaleSurvivalTo65, na.rm = TRUE),
+          median = median(MaleSurvivalTo65, na.rm = TRUE)) %>%
+          as.data.frame()
+
+```
+Similar to when we compared the life expectancy of the regions, the American and Asian countries have similar results: a mean around 71%, a max around 78%, a min around 65% and a median around 71%. The European countries however, differ significantly from the other two regions. Their maximum and minimum are more extreme, 85.1% and 41.6%, and their mean is 4.2% - 4.9% lower than the other regions.
+
+## 6.13 Female Survival to Age 65
+Survival to age 65 refers to the percentage of a cohort of newborn female infants that would survive to age 65, if subject to age specific mortality rates of the specified year.
+```{r}
+wdi.df.dimensions %>% 
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(FemaleSurvivalTo65, na.rm = TRUE),
+          max = max(FemaleSurvivalTo65, na.rm = TRUE),
+          min= min(FemaleSurvivalTo65, na.rm = TRUE),
+          median = median(FemaleSurvivalTo65, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+The average percentage of female survival to age 65 in all selected countries is 83.5%. The maximum country is 91.1%. The minimum country is 75.1%, and the median is 83.6%. If we were to compare these descriptive with their male counterparts from above, we would conclude that on average, females survive past the age of 65 13.3% more often than males do.
+
+```{r}
+wdi.df.dimensions %>% 
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(FemaleSurvivalTo65, na.rm = TRUE),
+          max = max(FemaleSurvivalTo65, na.rm = TRUE),
+          min= min(FemaleSurvivalTo65, na.rm = TRUE),
+          median = median(FemaleSurvivalTo65, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+The average percentage of female survival to age 65 in Americas is 81.5%, which is lower than that of Asia and Europe. Americas also have the lowest maximum and median percentage of female survival to age 65, which are 85.8% and 81.7%, respectively. Europe has the highest average, maximum and median percentage of female survival to age 65, which are 85.2%, 91.14%, and 85.9%, respectively. The minimum percentage of female survival to age 65 in Asia is the highest in all three regions.
+
+## 6.14 GDP per Employed Person
+GDP per employed person is gross domestic product (GDP) divided by total employment in the economy. Purchasing power parity (PPP) GDP is GDP converted to 2011 constant international dollars using PPP rates. An international dollar has the same purchasing power over GDP that a U.S. dollar has in the United States.
+```{r}
+wdi.df.dimensions %>% 
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(GDPperPersonEmployed, na.rm = TRUE),
+          max = max(GDPperPersonEmployed, na.rm = TRUE),
+          min= min(GDPperPersonEmployed, na.rm = TRUE),
+          median = median(GDPperPersonEmployed, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+The average GDP per employed person in all selected countries is 34,466 constant 2011 PPP US dollars (Purchasing power parity(PPP) GDP is GDP converted to 2011 constant international dollars using PPP rates), the maximum, minimum, and median GDP per employed person is $99,783, $6,886, and $27,276, respectively.
+
+```{r}
+wdi.df.dimensions %>% 
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(GDPperPersonEmployed, na.rm = TRUE),
+          max = max(GDPperPersonEmployed, na.rm = TRUE),
+          min= min(GDPperPersonEmployed, na.rm = TRUE),
+          median = median(GDPperPersonEmployed, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+The Americas show the lowest average and maximum GDP per employed person, where as Europe shows the highest average, maximum, minimum, and median GDP per employed person, and much higher than those of Americas and Asia.
+
+## 6.15 GDP per Capita
+GDP per capita is gross domestic product divided by midyear population. GDP is the sum of gross value added by all resident producers in the economy plus any product taxes and minus any subsidies not included in the value of the products. It is calculated without making deductions for depreciation of fabricated assets or for depletion and degradation of natural resources. Data are in current U.S. dollars.
+```{r}
+wdi.df.dimensions %>% 
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(GDPperCapita, na.rm = TRUE),
+          max = max(GDPperCapita, na.rm = TRUE),
+          min= min(GDPperCapita, na.rm = TRUE),
+          median = median(GDPperCapita, na.rm = TRUE)) %>%
+          as.data.frame()
+```
+The average GDP per capita in current US dollars in all selected countries is $8,318, with huge difference in the maximum and minimum GDP per capita, which are $4,8425 and $621, respectively.
+
+```{r}
+wdi.df.dimensions %>% 
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(GDPperCapita, na.rm = TRUE),
+          max = max(GDPperCapita, na.rm = TRUE),
+          min= min(GDPperCapita, na.rm = TRUE),
+          median = median(GDPperCapita, na.rm = TRUE)) %>%
+          arrange(mean, max, min) %>%
+          as.data.frame()
+```
+Asia shows the lowest average, maximum, minimum, and median GDP per capita in current US dollars, whereas the highest values are all in Europe. Americas are located in between.
+
+## 6.16 Health Expenditure Per Capita
+Total health expenditure is the sum of public and private health expenditures as a ratio of total population. It covers the provision of health services (preventive and curative), family planning activities, nutrition activities, and emergency aid designated for health but does not include provision of water and sanitation. Data are in current U.S. dollars.
+```{r}
+wdi.df.dimensions %>% 
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(HealthExpenditurePerCapita, na.rm = TRUE),
+          max = max(HealthExpenditurePerCapita, na.rm = TRUE),
+          min= min(HealthExpenditurePerCapita, na.rm = TRUE),
+          median = median(HealthExpenditurePerCapita, na.rm = TRUE)) %>%
+          as.data.frame() 
+```
+The average health expenditure per capita in all selected countries is $614 (current US dollars), with the highest value of $4,884 and the lowest value of only $39.
+
+```{r}
+wdi.df.dimensions %>% 
+group_by(wdi.df.dimensions$'region') %>%
+filter(country.code %in% focus_country_codes) %>%
+summarise(mean= mean(HealthExpenditurePerCapita, na.rm = TRUE),
+          max = max(HealthExpenditurePerCapita, na.rm = TRUE),
+          min= min(HealthExpenditurePerCapita, na.rm = TRUE),
+          median = median(HealthExpenditurePerCapita, na.rm = TRUE)) %>%
+          arrange(mean, max, min) %>%
+          as.data.frame()
+```
+Asia shows the lowest average, maximum, minimum, and median health expenditure per capita, then Americas. Europe shows much higher. 
+
+# 7.0 Variable Comparison by Quartile
+This section will cover our anlaysis of the variables run in quartiles. 
+
+## 7.1 Primary School Enrollment 
+The two code chunks below will bin the indicator Primary School Enrollment into quartiles, that is 4 subsets of the data divided equally. The bins are labeled Q1, Q2, Q3, and Q4, Q1 includes countries that have the highest percentage of children enrolled in school, while Q4 includes countries that have the lowest percentage. Next, the quantiles of Primary School Enrollment are compared to the two descriptives of poverty - national poverty percent and the percent of population living on less than $1.90 per day.
+
+
+```{r}
+        wdi.df.dimensions %>% 
+          group_by(PrimarySchoolEnrollment.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(NationalPovertyPercent, na.rm = TRUE),
+              max = max(NationalPovertyPercent, na.rm = TRUE),
+              min = min(NationalPovertyPercent, na.rm = TRUE),
+              median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+              as.data.frame()
+```
+
+```{r}
+        wdi.df.dimensions %>% 
+          group_by(PrimarySchoolEnrollment.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              min = min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+              as.data.frame()
+```    
+
+The results confirm our hypothesis, that is, as the percentage of children enrolled in Primary School decreases the mean national poverty percentage increases. For Q1, the mean national poverty level is 17.5%, and it gradually increases culminating in Q4 with a national poverty percentage of 45.5%.
+
+The second part of the analysis resulted in inconclusive findings, evaluation of primary school enrollment quantiles with the people living in deep poverty (Percentage of people living on $1.90 per day), we can observe that the relationship is not linear. The mean value of school enrollment is oscillating between the first three quartiles and then spikes to 14.01% in Q4. This will require further evaluations, or it could simply me attributed to the small sample size we had to work with due to large number of missing values.
+
+## 7.2 Pupil Teacher Ratio
+The two code chunks below will bin the indicator Pupil Teacher Ratio into quantiles, that is 4 subsets of the data divided equally. The bins are labeled Q1, Q2, Q3, and Q4, Q1 includes countries the lowest number of pupils per student, while Q4 includes countries that have the highest number of pupils per teacher. Q1 can be interpreted as having countries that are able to give each student the most attention, and that teachers are not overwhelmed by the number of students. Next, the quantiles of Pupil Teacher Ratio are compared to the two descriptives of poverty - national poverty percent and the percent of population living on less than $1.90 per day.
+
+```{r}
+        wdi.df.dimensions %>% 
+          group_by(PupilTeacherRatio.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(NationalPovertyPercent, na.rm = TRUE),
+              max = max(NationalPovertyPercent, na.rm = TRUE),
+              min = min(NationalPovertyPercent, na.rm = TRUE),
+              median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+              as.data.frame()
+```
+
+```{r}
+        wdi.df.dimensions %>% 
+          group_by(PupilTeacherRatio.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              min = min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+              as.data.frame()
+```
+Both of our hypothesis are confirmed, and the interpetation of the output is below.
+
+The results confirm our first hypothesis, that is, as the pupil teach ratio increases the mean national poverty percentage increases. For Q1, the mean national poverty level is 15.7%, and it gradually increases culminating in Q4 with a national poverty percentage of 47.6%.
+
+The results support our hypothesis our second hypothesis, that is, as the pupil to teacher ratio increases so does the percentage of people living in deep poverty. We can observe that for Q1 the percentage of people living on $1.90 per day is 1.77%, it gradually increases and culminates with 11.38% of the population living in deep poverty for Q4.
+
+## 7.3 Mortality Rate Under 5 
+We want to see to observe the averages of the poverty indicators as the mortality rate under 5 increases. The below code chunk separates the data into 4 subsets by the mortality rate under 5 indicator. Q1 represents the countries in observation that have the lowest mortality rate under 5 while Q4 represents the countries in observation that have the highest. The descriptives are then taken of both the `NationalPovertyPecent` and `PercentLivingon1.90PerDay` to observe the % of the country in poverty and the % of the country in deep poverty. 
+```{r}
+   wdi.df.dimensions %>% 
+          group_by(MortalityRateUnder5.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(NationalPovertyPercent, na.rm = TRUE),
+              max = max(NationalPovertyPercent, na.rm = TRUE),
+              min = min(NationalPovertyPercent, na.rm = TRUE),
+              median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+              as.data.frame()
+
+```
+
+```{r}
+   wdi.df.dimensions %>% 
+          group_by(MortalityRateUnder5.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              min = min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+              as.data.frame()
+
+```
+The results align with our hypothesis. As we move Q1 to Q4 where the rate of mortality under 5 years of age is increasing, the means of the national poverty percentage increase from 15.0% to 21.0% to 33.1% to 44.3%. In fact, the means are increasing almost exponentially at a rate of 1.45.
+
+The results show that the rate of deep poverty also increases as the rate of mortality rate under 5 years of age increase. The means increase from .086% to 4.3% to 8.3% to 12.0%. 
+
+Using the data we have available, there is a good chance that there is a relationship between the early mortality rate and the poverty indicators. The next step would be to test correlation using a regression.
+
+## 7.4 Percent with Access to Water
+Lets now look at access to water against the poverty indicators. As we have done above, we separate the countries into 4 subsets based on the `PercentwithAccessToWater` indicator and call for the descriptives of our poverty indicators.
+```{r}
+   wdi.df.dimensions %>% 
+          group_by(PercentWithAccessToWater.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(NationalPovertyPercent, na.rm = TRUE),
+              max = max(NationalPovertyPercent, na.rm = TRUE),
+              min = min(NationalPovertyPercent, na.rm = TRUE),
+              median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+              as.data.frame()
+```
+
+```{r}
+
+   wdi.df.dimensions %>% 
+          group_by( PercentWithAccessToWater.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              min = min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+              as.data.frame()
+
+```
+  
+The results initially support our hypothesis. As the access of percentage of people with to water increases, the level of poverty decreases. The means of the national poverty percentage decreases from 47.7% to 33.1% to 15.9% to 15.8%. The means of the percentage of people living on under $1.90 a day or what we have been referring to as deep poverty decreases from 12.3% to 8.6% to 3.0% to finally 1.6%. According to these four means of deep poverty, the percentage decreases exponentially at a rate of .5. There is sufficient evidence here that calls for a regression to test correlation.
+  
+## 7.5 Life Expectancy
+The following two chunks show the summary statistics about National Poverty Percent and Percent Living on $1.90 Per Day according to quartiles divided by Life Expectancy.
+```{r}
+        wdi.df.dimensions %>% 
+          group_by(LifeExpectancy.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(NationalPovertyPercent, na.rm = TRUE),
+              max = max(NationalPovertyPercent, na.rm = TRUE),
+              min = min(NationalPovertyPercent, na.rm = TRUE),
+              median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+              as.data.frame()
+```
+
+```{r}
+        wdi.df.dimensions %>% 
+          group_by(LifeExpectancy.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              min = min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+              as.data.frame()
+```
+
+The first two quartiles with lower expected life shows higher average percentage of national poverty of about 34.4% to 37.5%, whereas the last two quartiles with higher expected life show lower average percentage of national poverty of about 21% to 23%. That is the countries with lower expected life have high poverty rate than those with high expected life, supporting our hypothesis.
+The average percentage of living on $1.90 per day gradually decreases from Q1 to Q4, indicating the higher the expected life the lower the poverty.
+  
+
+## 7.6 Male Survival to 65 
+Now we will look at males who survive to at least age 65 against the poverty indicators. As we have done above, we seperate the countries into 4 subsets based on the `MaleSurvivalTo65` indicator and call for the descriptives of our poverty indicators. 
+```{r} 
+wdi.df.dimensions %>%
+  group_by(MaleSurvivalTo65.Q) %>%
+  filter(country.code %in% focus_country_codes) %>%
+    summarise(mean = mean(NationalPovertyPercent, na.rm = TRUE),
+              max = max(NationalPovertyPercent, na.rm = TRUE),
+              min = min(NationalPovertyPercent, na.rm = TRUE),
+              median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+    as.data.frame()
+```
+
+```{r} 
+wdi.df.dimensions %>%
+  group_by(MaleSurvivalTo65.Q) %>%
+  filter(country.code %in% focus_country_codes) %>%
+    summarise(mean = mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              min = min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+    as.data.frame()
+```  
+
+The results are inconculsive of our hypothesis. As the likeliness of males to live to at least 65 increases, the level of poverty decreases in Q1, increases in Q2 and Q3 but decreases again in Q4. The means of the national poverty percentage increases from 23.1% to 35.0%, then decreases to 33.1% to 21.7%. The means of the percentage of people living on under $1.90 a day or what we have been referring to as deep poverty increases from 4.1% to 9.5% then decreases to 8.6% to finally 5.2%. According to these four means of poverty, the percentage is not linear. As with 7.1 Primary School Enrollment, this could simply be attributed to the small sample size we had to work with due to large number of missing values. 
+
+  
+## 7.7 Female Survival to 65 
+The next two chunks of code will look at females who survive to at least age 65 against the poverty indicators. As we have done above, we seperate the countries into 4 subsets based on the `FemaleSurvivalTo65` indicator and call for the descriptives of our poverty indicators. 
+```{r} 
+wdi.df.dimensions %>%
+  group_by(FemaleSurvivalTo65.Q) %>%
+  filter(country.code %in% focus_country_codes) %>%
+    summarise(mean = mean(NationalPovertyPercent, na.rm = TRUE),
+              max = max(NationalPovertyPercent, na.rm = TRUE),
+              min = min(NationalPovertyPercent, na.rm = TRUE),
+              median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+    as.data.frame()
+```
+
+```{r} 
+wdi.df.dimensions %>%
+  group_by(FemaleSurvivalTo65.Q) %>%
+  filter(country.code %in% focus_country_codes) %>%
+    summarise(mean = mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              min = min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+    as.data.frame()
+```
+
+Unlike `MaleSurvivalTo65`,the results initally support our hypothesis. As the females survival to age 65 increases, the level of poverty decreases. The means of the national poverty percentage decreases from 47.7% to 33.15% to 15.9% to 15.8%. The means of the percentage of people living on under $1.90 a day decreases from 12.3% to 8.6% to 3.0% to 1.6%. Using the data we have available, there is a good chance that there is a relationship between females who survive to age 65 and the poverty indicators. 
+
+## 7.8 Health Expenditures Per Capita
+The following two chunks show the summary statistics about National Poverty Percent and Percent Living on $1.90 Per Day according to quartiles divided by health expenditure per capita.
+```{r}
+        wdi.df.dimensions %>% 
+          group_by(HealthExpenditurePerCapita.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(NationalPovertyPercent, na.rm = TRUE),
+              max = max(NationalPovertyPercent, na.rm = TRUE),
+              min = min(NationalPovertyPercent, na.rm = TRUE),
+              median = median(NationalPovertyPercent, na.rm = TRUE)) %>%
+              as.data.frame()
+```
+             
+```{r}
+        wdi.df.dimensions %>% 
+          group_by(HealthExpenditurePerCapita.Q) %>%
+            filter(country.code %in% focus_country_codes) %>%
+              summarise(mean = mean(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              max = max(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              min = min(PercentLivingOn1.90PerDay, na.rm = TRUE),
+              median = median(PercentLivingOn1.90PerDay, na.rm = TRUE)) %>%
+              as.data.frame()
+```
+
+The results show that both the average percentage of national poverty and average percentage of living on $1.90 per day consistently decrease as we move from Q1 to Q4, confirming our hypothesis that the poverty rate decreases with increasing health expenditure per capita.
+
+
+# 8.0 Conclusion
+Overall, we have found that Americas has the highest poverty and Europe the lowest, and the indicators tend to follow our hypothesis. To review the results, We have found that on average, the poorest countries are in Americas regions. While the overall percentage of people living on 1.90 a day is low, Americas has the larger average of people living on 1.90 a day, and Europe has the least. The overall percentage of people in primary school enrolment is high with Americas having the highest percentage on average, followed by Asia then Europe.The Americas has the highest pupul per teacher ratio as well, possibley indicating that there are more people in primary educatoin but have a higher student to teach ratio. America has the highest ratio of mortality rate under 5, followed by Aisa then Europe. Each region has a very high percentage of population with access to clean drinking water. The Americas has the highest populatoin followed by Europe the Asia. Americas has the most people under 14 years of age while all three regions have most of its population between 15 and 64, working age, and the least amount of people 65 and older. Life expectancy for each country is on average 73 years of age. In terms of male to female, males on average who live to 65 is around 70% with Europe haveing a mean of 67%. The average of females living to 65 is 81% to 85% with Americas having the lowest and Europe having the highest. On average, females tend to outlive males. In terms of GDP per employeed person, Europe has the highest percentage with a mean of 60% and Americas and Asia are very similar with a mean of 24%. GDP per capita on average per region varies with Europe being the highest, $17,130. and Asia being the lowest, $4,199. Americas is not far off from Asia. Finally, our last variable, health expenditure per capita shows Asia having the lowest on average at $231, then Americas at $328, and Europe the highest at $1,427.
+
+Looking at the variables in quartiless, we see that the majority of the variables tend to align with our hypothesis. As one goes up the other goes down. There were a few exceptions such as primary school enrollment and making $1.90 a day and male survival to age 65. This could be due to not having enough data or not enough current data.
+
+# 9 Next Steps
+Our next steps would entail using some `R` statistical tool sets such as `ggplot` to run some linear regressions, plots and visuals such as histograms to learn more about how each indicator effects poverty. We would also like to view at a lower level such as sub-region to see if there is a similar effect. 
+
+
+
+
